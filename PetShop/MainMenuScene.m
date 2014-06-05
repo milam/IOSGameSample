@@ -17,10 +17,15 @@
 - (void) didMoveToView:(SKView *)view
 {
     if (!self.sceneCreated)
-    {
-        self.backgroundColor = [SKColor blackColor];
+    {   SKSpriteNode *backgroundSprite =[SKSpriteNode spriteNodeWithImageNamed:@"BackgroundN2"];
+        [backgroundSprite setXScale:.4];
+        [backgroundSprite setYScale:.4];
+        
+        [backgroundSprite setPosition:CGPointMake(CGRectGetMidX(self.frame), CGRectGetMidY(self.frame))];
+        self.backgroundColor = [SKColor grayColor];
         self.scaleMode = SKSceneScaleModeAspectFill;
         [self addChild: [self createMenuNode]];
+        [self addChild:backgroundSprite];
         self.sceneCreated = YES;
     }
 }
@@ -32,18 +37,19 @@
     [SKLabelNode labelNodeWithFontNamed:@"Comic Sans"];
     
     menuNode.name = @"menuNode";
-    menuNode.text = @"Animal Shelter Rescue - Tap Screen to Play";
+    menuNode.text = @"Tap Anywhere To Play!";
     menuNode.fontSize = 14;
-    menuNode.fontColor = [SKColor yellowColor];
+    menuNode.fontColor = [SKColor redColor];
     
     menuNode.position =
-    CGPointMake(CGRectGetMidX(self.frame), CGRectGetMidY(self.frame));
+    CGPointMake(CGRectGetMaxX(self.frame)/2, CGRectGetMaxY(self.frame)/6);
     
     return menuNode;
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
 {
+
     SKNode *menuNode = [self childNodeWithName:@"menuNode"];
     
     if (menuNode != nil)

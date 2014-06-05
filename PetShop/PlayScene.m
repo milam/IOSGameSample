@@ -17,7 +17,7 @@ static const uint32_t basketCategory            =  0x1 << 0;
 static const uint32_t petCategory               =  0x1 << 1;
 static const uint32_t conveyorCategory          =  0x1 << 2;
 static const uint32_t nullColliderCategory1     =  0x1 << 3;
-static const uint32_t nullColliderCategory2     =  0x1 << 4;
+
 
 @interface PlayScene()
 {
@@ -26,6 +26,7 @@ static const uint32_t nullColliderCategory2     =  0x1 << 4;
 }
 @property BOOL sceneCreated;
 @property int score;
+@property int topScore;
 @property int petCount;
 @property int petsCaught;
 @property SKSpriteNode *selectedNode;
@@ -41,14 +42,14 @@ float BG_VELOCITY                  = (TIME * 60);
 
 #pragma mark score methods
 
--(void) saveScore:(NSNumber*)score currentTopScore:(int)topScore
+-(void) saveScore:(NSNumber*)score currentTopScore:(NSNumber*)topScore
 {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    if([score intValue]>=topScore)
+    if([score intValue]>=[topScore intValue])
     {
     [defaults setValue:score forKey:@"Top_Score"];
     }
-    [defaults setValue:score forKey:@"Last_Score"];
+    [defaults setValue:topScore forKey:@"Last_Score"];
 
     //Save changes
     [defaults synchronize];
@@ -58,7 +59,8 @@ float BG_VELOCITY                  = (TIME * 60);
 {   int score;
     
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    score = [[defaults objectForKey:@"Top_Score"] intValue];
+    score = [[defaults objectForKey:@"Last_Score"] intValue];
+    self.topScore = [[defaults objectForKey:@"Top_Score"] intValue];
     
     return score;
 }
@@ -87,8 +89,13 @@ static inline CGPoint CGPointMultiplyScalar(const CGPoint a, const CGFloat b)
         BG_VELOCITY*=1.05;  //increases speed by 5% every level
     
         UIPanGestureRecognizer *gestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePanFrom:)];
-        [[self view] addGestureRecognizer:gestureRecognizer];        [self initPlayScene];
+        [[self view] addGestureRecognizer:gestureRecognizer];
+        [self initPlayScene];
         self.sceneCreated = YES;
+        SKNode *scoreNode = [self createScoreNode];
+        
+        [self addChild:scoreNode];
+        
     }
 }
 
@@ -162,7 +169,7 @@ float degToRad(float degree) {
                                                  ]];
     
     [self runAction: [SKAction repeatAction:releasePets
-                                      count:self.petCount]completion:^{
+                                      count:self.petCount/2]completion:^{
         [self gameOver];}];
     [self runAction: [SKAction repeatAction:releaseBaskets
                                       count:self.petCount/3]];
@@ -189,9 +196,18 @@ float degToRad(float degree) {
         self.lastUpdateTimeInterval = currentTime;
     }
     
+    
     [self updateWithTimeSinceLastUpdate:timeSinceLast];
     
     [self moveBottomScroller];
+    
+    if (self.score > 0) {
+        [[self childNodeWithName:@"scoreNode"] removeFromParent];
+        SKNode *scoreNode = [self createScoreNode];
+        
+        [self addChild:scoreNode];
+    }
+
 }
 
 - (void)updateWithTimeSinceLastUpdate:(CFTimeInterval)timeSinceLast
@@ -243,14 +259,23 @@ float degToRad(float degree) {
 ////////collision
 - (void)pet:(SKSpriteNode *)pet didCollideWithBasket:(SKSpriteNode *)basket
 {
-    NSLog(@"%@ and %@", pet.name, basket.name);
-    if([pet.name isEqualToString:@"Cat"])
+    SKNode *labelBasket = [basket childNodeWithName:@"labelNode"];
+    SKNode *labelPet = [pet childNodeWithName:@"labelNode"];
+    pet.name = ((SKLabelNode*)labelPet).text;
+    NSString *basketLabel = ((SKLabelNode*)labelBasket).text;
+    
+    
+    NSLog(@"%@ and %@", pet.name, basketLabel);
+    
+    if([pet.name isEqualToString:basketLabel])
     {
     self.score++;
-    [pet removeFromParent];
+        [pet removeFromParent];
+        [basket removeFromParent];
     }
-
-    //[pet removeFromParent];
+    
+//    [pet removeFromParent];
+//    [basket removeFromParent];
 }
 
 - (void)didBeginContact:(SKPhysicsContact *)contact
@@ -268,6 +293,9 @@ float degToRad(float degree) {
     
     [self pet:(SKSpriteNode *) firstBody.node didCollideWithBasket:(SKSpriteNode *) secondBody.node];
 }
+
+
+
 
 
 #pragma mark Create Sprites
@@ -297,37 +325,34 @@ float degToRad(float degree) {
     switch ((int)typeOfPet) {
         case 0:
             labelNode.text = @"Bird";
-            labelNode.name = @"Bird";
+            
             break;
         case 1:
             labelNode.text = @"Cat";
-            labelNode.name = @"Cat";
+            
             
             break;
         case 2:
             labelNode.text = @"Dog";
-            labelNode.name = @"Dog";
+            
             break;
         case 3:
             labelNode.text = @"Fish";
-            labelNode.name = @"Fish";
+            
             break;
         case 4:
             labelNode.text = @"Turtle";
-            labelNode.name = @"Turtle";
+            
             break;
         default:
             break;
     }
+    labelNode.name = @"labelNode";
     //NSLog(@"%@", labelNode.name);//debug
     
-    labelNode.fontSize = 14;
-    labelNode.fontColor = [SKColor darkGrayColor];
-    labelNode.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:basketNode.frame.size.height/3];
     
-    labelNode.physicsBody.categoryBitMask = basketCategory;
-    labelNode.physicsBody.collisionBitMask = nullColliderCategory1;
-    labelNode.physicsBody.contactTestBitMask = petCategory;
+    labelNode.fontSize = 14;
+    labelNode.fontColor = [SKColor blueColor];
     
     
     [basketNode addChild:labelNode];
@@ -386,6 +411,8 @@ float degToRad(float degree) {
     
 }
 
+
+
 - (SKSpriteNode *)createPetNode:(CGPoint)Position
 {
     CGFloat typeOfPet = randomBetween(0, 5.0);
@@ -396,9 +423,6 @@ float degToRad(float degree) {
     
     SKLabelNode *labelNode = [[SKLabelNode alloc] initWithFontNamed:@"Times New Roman"];
 
-    
-    
-    
     
     
     ////
@@ -428,7 +452,7 @@ float degToRad(float degree) {
     }
     
     labelNode.text = petName;
-    labelNode.name = petName;
+    labelNode.name = @"labelNode";
     
     SKSpriteNode *petNode =
     [[SKSpriteNode alloc] initWithImageNamed:petType];
@@ -443,19 +467,13 @@ float degToRad(float degree) {
     
     petNode.physicsBody.collisionBitMask = nullColliderCategory1;
     
-     petNode.physicsBody.contactTestBitMask = basketCategory;
+    petNode.physicsBody.contactTestBitMask = basketCategory;
     
     
     //
     labelNode.fontSize = 14;
     labelNode.fontColor = [SKColor darkGrayColor];
-    labelNode.physicsBody = [SKPhysicsBody bodyWithCircleOfRadius:petNode.frame.size.height/8];
-    
-    
-    labelNode.physicsBody.categoryBitMask = petCategory;
-    labelNode.physicsBody.collisionBitMask = nullColliderCategory1;
-    labelNode.physicsBody.contactTestBitMask = basketCategory;
-    
+
     
     [petNode addChild:labelNode];
     labelNode.position = CGPointMake(0, 3);
@@ -479,24 +497,48 @@ static inline CGFloat randomBetween(CGFloat low, CGFloat high)
 }
 
 
-- (SKLabelNode *) createScoreNode
+- (SKNode *) createScoreNode
 {
-    SKLabelNode *scoreNode =
-    [SKLabelNode labelNodeWithFontNamed:@"Comic Sans"];
+    SKNode *scoreText = [SKNode node];
+    SKLabelNode *a = [SKLabelNode labelNodeWithFontNamed:@"Arial"];
+    a.fontSize = 36;
+    a.fontColor = [SKColor yellowColor];
+    NSString *st1 =[NSString stringWithFormat:@"Score: %i", self.score];
+    a.text = st1;
+    [scoreText addChild:a];
+    scoreText.name = @"scoreNode";
+    scoreText.position = CGPointMake(self.frame.size.width*.6, self.frame.size.height*.9);
+
     
-    scoreNode.name = @"scoreNode";
+
     
-    NSString *newScore =
-    [NSString stringWithFormat:@"Score: %i", self.score];
+    return scoreText;
+}
+
+
+- (SKNode *) createFinalScoreNode
+{
+    SKNode *scoreText = [SKNode node];
+    SKLabelNode *a = [SKLabelNode labelNodeWithFontNamed:@"Arial"];
+    a.fontSize = 36;
+    a.fontColor = [SKColor yellowColor];
+    SKLabelNode *b = [SKLabelNode labelNodeWithFontNamed:@"Arial"];
+    b.fontSize = 36;
+    b.fontColor = [SKColor yellowColor];
+    NSString *st1 =[NSString stringWithFormat:@"Score: %i", self.score];
+    NSString *st2 =[NSString stringWithFormat:@"Top Score: %i", self.topScore];
+    b.position = CGPointMake(b.position.x, b.position.y - 50);
+    a.text = st1;
+    b.text = st2;
+    [scoreText addChild:a];
+    [scoreText addChild:b];
+    scoreText.name = @"scoreNode";
+    scoreText.position = CGPointMake(self.frame.size.width/2, self.frame.size.height/2);
     
-    scoreNode.text = newScore;
-    scoreNode.fontSize = 36;
-    scoreNode.fontColor = [SKColor blackColor];
     
-    scoreNode.position =
-    CGPointMake(CGRectGetMidX(self.frame)*1.5, CGRectGetMidY(self.frame)*1.5);
     
-    return scoreNode;
+    
+    return scoreText;
 }
 
 #pragma mark Handle interactions
@@ -530,7 +572,8 @@ CGPoint mult(const CGPoint v, const CGFloat s) {
 #pragma mark Create end game condition
 - (void) gameOver
 {
-    SKLabelNode *scoreNode = [self createScoreNode];
+    [self saveScore:[NSNumber numberWithInt: self.score] currentTopScore:[NSNumber numberWithInt: self.loadScore]];
+    SKNode *scoreNode = [self createFinalScoreNode];
     
     [self addChild:scoreNode];
     
